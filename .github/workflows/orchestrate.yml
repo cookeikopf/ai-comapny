@@ -2,7 +2,7 @@ name: Orchestrator
 
 on:
   issues:
-    types: [labeled]   # vermeidet doppelte Runs
+    types: [labeled]   # nur wenn Label gesetzt wird
 
 concurrency:
   group: orchestrate-${{ github.event.issue.number }}
@@ -30,8 +30,7 @@ jobs:
         id: orch
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
-        run: |
-          python scripts/orchestrate.py
+        run: python scripts/orchestrate.py
 
       - name: Commit plan files
         run: |
@@ -46,7 +45,8 @@ jobs:
         with:
           script: |
             const issue_number = context.payload.issue.number;
-            const body = `Plan erzeugt/aktualisiert: \`${process.env.PLAN_PATH}\``;
+            const planPath = process.env.PLAN_PATH;
+            const body = `Plan erzeugt/aktualisiert: \`${planPath}\``;
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
