@@ -5,7 +5,7 @@ on:
 
 jobs:
   plan_and_delegate:
-    # nur laufen, wenn Label task:agent vorhanden ist oder gerade gesetzt wurde
+    # Läuft, wenn das Label bereits dran ist ODER gerade gesetzt wurde
     if: >
       (github.event.action == 'labeled' && github.event.label.name == 'task:agent') ||
       contains(toJson(github.event.issue.labels), 'task:agent')
