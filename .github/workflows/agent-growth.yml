@@ -1,0 +1,53 @@
+name: Agent Growth
+on:
+  repository_dispatch:
+    types: [agent-growth]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  growth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read payload
+        run: |
+          echo "ISSUE_NUMBER=${{ github.event.client_payload.issue_number }}" >> $GITHUB_ENV
+          echo "PLAN_PATH=${{ github.event.client_payload.plan_path }}" >> $GITHUB_ENV
+          echo "ISSUE_TITLE=${{ github.event.client_payload.issue_title }}" >> $GITHUB_ENV
+
+      - name: Add deterministic outreach drafts (idempotent)
+        run: |
+          mkdir -p drafts/outreach
+          if [ ! -f drafts/outreach/template.md ]; then
+            cat > drafts/outreach/template.md << 'MD'
+# Outreach Draft (v1)
+
+**Ziel:** Leads aus Parsing-Pipeline  
+**CTA:** 15-min Call oder 2-Min-Demo
+
+## Version A (Kurz)
+Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}}min automatisiert.
+Darf ich dir in 2 Screens zeigen, wie?
+
+## Version B (Value-first)
+Hey {{first_name}}, mir ist bei {{company}} aufgefallen: {{trigger}}.
+Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-min Demo schicken?
+
+— {{sender}}
+MD
+          fi
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "feat(growth): outreach drafts v1"
+          branch: "agent/growth/issue-${{ env.ISSUE_NUMBER }}"
+          title: "Growth: Outreach-Drafts für #${{ env.ISSUE_NUMBER }}"
+          body: |
+            Basierend auf Plan: `${{ env.PLAN_PATH }}`
+            Closes #${{ env.ISSUE_NUMBER }} (falls passend)
+          labels: agent:growth, ready-for-review
