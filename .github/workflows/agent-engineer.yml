@@ -1,27 +1,21 @@
 name: Agent Engineer
-
 on:
   repository_dispatch:
     types: [agent-engineer]
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   engineer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
+        with: { fetch-depth: 0 }
       - name: Read payload
         run: |
           echo "ISSUE_NUMBER=${{ github.event.client_payload.issue_number }}" >> $GITHUB_ENV
           echo "PLAN_PATH=${{ github.event.client_payload.plan_path }}" >> $GITHUB_ENV
           echo "ISSUE_TITLE=${{ github.event.client_payload.issue_title }}" >> $GITHUB_ENV
-
       - name: Ensure deterministic test scaffolding (idempotent)
         run: |
           mkdir -p tests
@@ -38,27 +32,19 @@ def test_basic_normalization():
   assert isinstance(out, list) and len(out) >= 1
 PY
           fi
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
       - name: Install test deps
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest
-
       - name: Quick local test (non-blocking)
         continue-on-error: true
-        run: |
-          pytest -q || true
-
+        run: pytest -q || true
       - name: Git config
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
         with:
@@ -67,11 +53,7 @@ PY
           title: "Engineer: Tests/Scaffolding für #${{ env.ISSUE_NUMBER }}"
           body: |
             Basierend auf Plan: `${{ env.PLAN_PATH }}`
-
-            - Fügt/gewährleistet Smoke-Test für `scripts/normalize_leads.py`
-            - Idempotent, nur Ergänzungen
-
-            Closes #${{ env.ISSUE_NUMBER }} (falls Issue dieses Deliverable explizit fordert)
+            - Smoke-Test für `scripts/normalize_leads.py` (idempotent)
           labels: agent:engineer, ready-for-review
           signoff: true
           delete-branch: true
