@@ -1,20 +1,27 @@
 name: orchestrate
 on:
   issues:
-    types:
-      - opened
-      - labeled
+    types: [opened, labeled, edited]
+
 jobs:
   plan_and_delegate:
-    if: contains(github.event.issue.labels.*.name, 'task:agent')
+    # Läuft, wenn das Issue bereits das Label hat ODER gerade gelabelt wurde
+    if: >
+      (github.event.action == 'labeled' && github.event.label.name == 'task:agent') ||
+      contains(toJson(github.event.issue.labels), 'task:agent')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: |
-          python -m pip install --quiet
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Run orchestrator
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          python scripts/orchestrate.py --issue "$GITHUB_EVENT_PATH"
+        run: python scripts/orchestrate.py
