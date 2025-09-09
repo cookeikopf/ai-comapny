@@ -21,3 +21,11 @@ Dieses Projekt verfolgt einen **Deterministic‑first, AI‑last**‑Ansatz. Auf
 
 ## Ordnerstruktur
 Siehe die Unterordner (`.github`, `agents`, `scripts`, `docs`, `kb`, `sales`, `outreach`, `finance`, `reports`, `sops`, `config`).
+
+### How it works (ai-company)
+- **Label `task:agent`** auf ein Issue → Orchestrator erzeugt Plan + kommentiert Link → triggert Engineer/Growth.
+- **Engineer** erstellt/ergänzt Tests & Code; **Growth** Drafts. Beide öffnen PRs.
+- **HITL:** Du reviewst & mergest. Branches werden nach Merge gelöscht.
+- **Secret Scan (soft)** und **Eval** laufen als Checks.
+
+Weitere Policies siehe `config/policies.yaml` (`deterministic_first: true`).

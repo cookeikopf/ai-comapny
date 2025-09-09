@@ -1,6 +1,10 @@
 import os, json, datetime, pathlib, traceback
+
+
 def yaml_escape(s: str) -> str:
     return (s or "").replace("\\", "\\\\").replace('"', '\\"')
+
+
 def main():
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if not event_path or not os.path.exists(event_path):
@@ -25,12 +29,15 @@ def main():
               "owner: orchestrator", "agents: [engineer, growth]",
               f"created_utc: {datetime.datetime.utcnow().strftime('%Y%m%d-%H%M%S')}", "---", ""]
         md = f"""# Plan für Issue #{num}: {title}
+
 ## Kontext
 {body or '(kein Issue-Body)'}
+
 ## Deterministischer Ansatz
 1. I/O spezifizieren, Tests zuerst
 2. Agent-PRs mit `Closes #{num}`
 3. HITL: du prüfst & mergest
+
 ## Deliverables
 - [ ] Engineer (Code/Tests)
 - [ ] Growth (Outreach-Drafts)
@@ -40,8 +47,11 @@ def main():
     if gh_out:
         with open(gh_out, "a", encoding="utf-8") as f: f.write(f"plan_path={plan_path}\n")
     print(f"[orchestrate] plan_path={plan_path}"); return 0
+
+
 if __name__ == "__main__":
-    try: raise SystemExit(main())
+    try:
+        raise SystemExit(main())
     except Exception:
         print("[orchestrate] FATAL:\n" + traceback.format_exc())
         gh_out = os.environ.get("GITHUB_OUTPUT")

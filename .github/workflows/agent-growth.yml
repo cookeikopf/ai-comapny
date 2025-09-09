@@ -2,34 +2,45 @@ name: Agent Growth
 on:
   repository_dispatch:
     types: [agent-growth]
+  workflow_dispatch:
+    inputs:
+      issue_number: { description: Issue #, required: true }
+      plan_path:    { description: Plan path, required: false }
+      issue_title:  { description: Issue title, required: false }
+concurrency:
+  group: agent-growth-${{ github.event.client_payload.issue_number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
 permissions:
   contents: write
   pull-requests: write
 jobs:
   growth:
     runs-on: ubuntu-latest
+    env:
+      ISSUE_NUMBER: ${{ github.event.client_payload.issue_number || inputs.issue_number || '0' }}
+      PLAN_PATH:    ${{ github.event.client_payload.plan_path    || inputs.plan_path    || '' }}
+      ISSUE_TITLE:  ${{ github.event.client_payload.issue_title  || inputs.issue_title  || '' }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Read payload
-        run: |
-          echo "ISSUE_NUMBER=${{ github.event.client_payload.issue_number }}" >> $GITHUB_ENV
-          echo "PLAN_PATH=${{ github.event.client_payload.plan_path }}" >> $GITHUB_ENV
-          echo "ISSUE_TITLE=${{ github.event.client_payload.issue_title }}" >> $GITHUB_ENV
       - name: Add deterministic outreach drafts (idempotent)
         run: |
           mkdir -p drafts/outreach
           if [ ! -f drafts/outreach/template.md ]; then
             cat > drafts/outreach/template.md << 'MD'
 # Outreach Draft (v1)
+
 **Zielkunden:** B2B-Leads aus Parsing-Pipeline  
 **CTA:** 15-min Call oder 2-Min-Demo
+
 ## Version A (Kurz)
 Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}} Minuten automatisiert.
 Darf ich dir in 2 Screens zeigen, wie?
+
 ## Version B (Value-first)
 Hey {{first_name}}, mir ist bei {{company}} aufgefallen: {{trigger}}.
 Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-Min-Demo schicken?
+
 — {{sender}}
 MD
           fi
@@ -39,10 +50,6 @@ MD
 Deterministische Vorlagen. Keine PII/Secrets. Änderungen per PR.
 MD
           fi
-      - name: Git config
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
         with:

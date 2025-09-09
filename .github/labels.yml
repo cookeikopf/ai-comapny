@@ -1,0 +1,7 @@
+- name: task:agent
+  color: 5319e7
+  description: Orchestrator triggers agents
+- name: agent:engineer
+  color: 0e8a16
+- name: agent:growth
+  color: 1d76db

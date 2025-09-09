@@ -2,20 +2,27 @@ name: Agent Engineer
 on:
   repository_dispatch:
     types: [agent-engineer]
+  workflow_dispatch:
+    inputs:
+      issue_number: { description: Issue #, required: true }
+      plan_path:    { description: Plan path, required: false }
+      issue_title:  { description: Issue title, required: false }
+concurrency:
+  group: agent-engineer-${{ github.event.client_payload.issue_number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
 permissions:
   contents: write
   pull-requests: write
 jobs:
   engineer:
     runs-on: ubuntu-latest
+    env:
+      ISSUE_NUMBER: ${{ github.event.client_payload.issue_number || inputs.issue_number || '0' }}
+      PLAN_PATH:    ${{ github.event.client_payload.plan_path    || inputs.plan_path    || '' }}
+      ISSUE_TITLE:  ${{ github.event.client_payload.issue_title  || inputs.issue_title  || '' }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Read payload
-        run: |
-          echo "ISSUE_NUMBER=${{ github.event.client_payload.issue_number }}" >> $GITHUB_ENV
-          echo "PLAN_PATH=${{ github.event.client_payload.plan_path }}" >> $GITHUB_ENV
-          echo "ISSUE_TITLE=${{ github.event.client_payload.issue_title }}" >> $GITHUB_ENV
       - name: Ensure deterministic test scaffolding (idempotent)
         run: |
           mkdir -p tests
@@ -34,17 +41,12 @@ PY
           fi
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - name: Install test deps
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           python -m pip install pytest
       - name: Quick local test (non-blocking)
         continue-on-error: true
         run: pytest -q || true
-      - name: Git config
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
         with:
