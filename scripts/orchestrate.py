@@ -1,31 +1,56 @@
-#!/usr/bin/env python
-"""
-Simple orchestrator stub: reads a GitHub issue event, writes a plan stub and creates tasks.
-In a real implementation this script would call GPT‑5 via OpenAI's API, generate plans
-and tasks, and open issues/PRs accordingly.
-"""
-import json
-import os
-import sys
-import datetime as dt
-import pathlib
+# scripts/orchestrate.py
+import os, json, datetime, pathlib, re
 
-def main():
-    # Determine event path from environment or argument
-    event_path = os.environ.get("GITHUB_EVENT_PATH") or (sys.argv[1] if len(sys.argv) > 1 else None)
-    if not event_path or not os.path.exists(event_path):
-        print("No event file found. This script must be run by GitHub Actions.")
-        return
-    event = json.load(open(event_path))
-    issue = event.get("issue", {})
-    title = issue.get("title", "Untitled task")
-    # Create reports directory
-    pathlib.Path("reports/board").mkdir(parents=True, exist_ok=True)
-    timestamp = dt.datetime.utcnow().strftime("%Y%m%d-%H%M")
-    plan_path = f"reports/board/plan-{timestamp}.md"
-    with open(plan_path, "w") as f:
-        f.write(f"# Plan Stub\n\n- Task: {title}\n- Owner: founder\n- KPIs: TBD\n")
-    print(f"Wrote plan stub to {plan_path}")
+event = json.load(open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8"))
+issue = event["issue"]
+num   = issue["number"]
+title = issue["title"].strip()
+body  = (issue.get("body") or "").strip()
 
-if __name__ == "__main__":
-    main()
+pathlib.Path("reports/board").mkdir(parents=True, exist_ok=True)
+
+# Finde ggf. bestehende Plan-Datei für dieses Issue
+existing = sorted(pathlib.Path("reports/board").glob(f"plan-{num}-*.md"))
+if existing:
+    plan_path = str(existing[-1])
+    should_write = False
+else:
+    ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    plan_path = f"reports/board/plan-{num}-{ts}.md"
+    should_write = True
+
+if should_write:
+    fm = [
+        "---",
+        f"issue: {num}",
+        f'title: "{title.replace('"','\\"')}"',
+        "deterministic_first: true",
+        "owner: orchestrator",
+        "agents: [engineer, growth]",
+        f"created_utc: {datetime.datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+        "---",
+        "",
+    ]
+    md = f"""# Plan für Issue #{num}: {title}
+
+## Kontext
+{body or '(kein Issue-Body)'}
+
+## Deterministischer Ansatz
+1. I/O spezifizieren, Tests zuerst
+2. Agent-PRs mit `Closes #{num}`
+3. HITL: du prüfst & mergest
+
+## Deliverables
+- [ ] Engineer (Code/Tests)
+- [ ] Growth (Outreach-Drafts)
+"""
+    with open(plan_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(fm) + md)
+
+# Output für GitHub Actions
+gh_out = os.environ.get("GITHUB_OUTPUT")
+if gh_out:
+    with open(gh_out, "a", encoding="utf-8") as f:
+        f.write(f"plan_path={plan_path}\n")
+print(f"[orchestrate] plan_path={plan_path}")
