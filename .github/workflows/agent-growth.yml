@@ -1,4 +1,5 @@
 name: Agent Growth
+
 on:
   repository_dispatch:
     types: [agent-growth]
@@ -12,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Read payload
         run: |
@@ -26,20 +29,31 @@ jobs:
             cat > drafts/outreach/template.md << 'MD'
 # Outreach Draft (v1)
 
-**Ziel:** Leads aus Parsing-Pipeline  
+**Zielkunden:** B2B-Leads aus Parsing-Pipeline  
 **CTA:** 15-min Call oder 2-Min-Demo
 
 ## Version A (Kurz)
-Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}}min automatisiert.
+Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}} Minuten automatisiert.
 Darf ich dir in 2 Screens zeigen, wie?
 
 ## Version B (Value-first)
 Hey {{first_name}}, mir ist bei {{company}} aufgefallen: {{trigger}}.
-Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-min Demo schicken?
+Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-Min-Demo schicken?
 
 — {{sender}}
 MD
           fi
+          if [ ! -f drafts/README.md ]; then
+            cat > drafts/README.md << 'MD'
+# Drafts
+Deterministische Vorlagen. Keine PII/Secrets. Änderungen immer per PR.
+MD
+          fi
+
+      - name: Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
@@ -49,5 +63,11 @@ MD
           title: "Growth: Outreach-Drafts für #${{ env.ISSUE_NUMBER }}"
           body: |
             Basierend auf Plan: `${{ env.PLAN_PATH }}`
-            Closes #${{ env.ISSUE_NUMBER }} (falls passend)
+
+            - Legt `drafts/outreach/template.md` an (falls fehlend)
+            - Fügt `drafts/README.md` hinzu (Guidelines)
+
+            Closes #${{ env.ISSUE_NUMBER }} (falls Issue dieses Deliverable explizit fordert)
           labels: agent:growth, ready-for-review
+          signoff: true
+          delete-branch: true
