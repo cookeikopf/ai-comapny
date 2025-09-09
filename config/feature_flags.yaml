@@ -1,0 +1,8 @@
+# Feature flags control optional capabilities of the system. Set these
+# values to `true` to enable live side‑effect actions once you are ready.
+# Until then, all side‑effects run in a dry‑run or simulated mode and
+# require human approval via GitHub Environments.
+
+allow_outbound_email: false
+allow_slack_post: false
+allow_web_rpa: false

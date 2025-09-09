@@ -1,0 +1,30 @@
+name: Agent Task
+description: Strukturiertes Ticket für den Orchestrator und Spezial‑Agenten
+title: "[TASK] {Kurzbeschreibung}"
+labels: ["task:agent", "triage"]
+body:
+  - type: input
+    id: outcome
+    attributes:
+      label: "Ziel (SMART)"
+      placeholder: "z.B. 20 qualifizierte Leads/Woche"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: "Kontext/Constraints (Budget, Deadlines, Risiken)"
+      placeholder: "Budget 20 € pro Tag; Deadline 5 Tage; Risiken: GDPR, AI‑Act"
+  - type: dropdown
+    id: risk
+    attributes:
+      label: "Risikostufe"
+      options:
+        - low
+        - medium
+        - high
+  - type: textarea
+    id: eval
+    attributes:
+      label: "Akzeptanzkriterien/Eval"
+      placeholder: "KPIs, Benchmarks, Score‑Thresholds"

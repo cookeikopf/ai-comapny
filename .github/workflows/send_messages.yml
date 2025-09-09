@@ -1,0 +1,27 @@
+name: send_messages
+on:
+  workflow_dispatch:
+    inputs:
+      draft_ids:
+        description: 'Comma‑separated list of draft IDs to send'
+        required: true
+      dry_run:
+        description: 'Set to true to simulate sending messages'
+        default: 'true'
+        required: false
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          python -m pip install --quiet
+      - name: Send messages
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DRAFT_IDS: ${{ github.event.inputs.draft_ids }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          python scripts/send_messages.py --draft-ids "$DRAFT_IDS" --dry-run "$DRY_RUN"

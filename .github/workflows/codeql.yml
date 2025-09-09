@@ -1,0 +1,10 @@
+name: codeql
+on:
+  pull_request:
+  schedule:
+    - cron: '0 3 * * *'
+jobs:
+  analyze:
+    uses: github/codeql-action/analyze@v3
+    with:
+      category: 'security-and-quality'

@@ -1,0 +1,27 @@
+name: Bug Report
+description: Melde einen Fehler oder unerwartetes Verhalten
+title: "[BUG] {Kurzbeschreibung}"
+labels: ["bug"]
+body:
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Erwartetes Verhalten"
+      placeholder: "Was sollte passieren?"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Tatsächliches Verhalten + Logs/Trace‑IDs"
+      placeholder: "Beschreibe das Problem, füge relevante Logs oder Trace‑IDs hinzu."
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Schweregrad"
+      options:
+        - sev-3 (minor)
+        - sev-2 (degradation)
+        - sev-1 (critical)

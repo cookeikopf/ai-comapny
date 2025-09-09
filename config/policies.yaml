@@ -1,0 +1,75 @@
+actions:
+  email:
+    # Actions that agents may perform without explicit human approval.
+    # These typically include safe operations like reading and drafting.
+    allowed_without_approval:
+      - read
+      - search
+      - summarize
+      - draft
+    # Actions requiring your approval before being executed. Sending any email
+    # is considered a side‑effect and must go through the HITL gate.
+    require_approval:
+      - send
+  slack:
+    # Slack operations that agents may perform autonomously. These include
+    # reading messages, listing users/channels and posting to internal
+    # channels dedicated to drafts or summaries. External or customer‑facing
+    # posts are never allowed without approval.
+    allowed_without_approval:
+      - read
+      - list
+      - post_internal
+      - reply_thread_internal
+    require_approval:
+      - post_customer
+      - post_external
+engineering:
+  # Engineering actions that can be performed autonomously by the
+  # Engineer/Codex agent. Creating branches, committing files and opening
+  # pull requests are safe to perform automatically. Merging into main or
+  # deploying changes always requires a human gate and is enforced via
+  # branch and environment protections in GitHub.
+  allowed:
+    - create_branch
+    - commit_file
+    - open_pull_request
+  restricted: []
+
+# ----------------------------------------------------------
+# Deterministic‑first strategy and escalation guidelines
+#
+# The orchestrator operates in "deterministic_first" mode. It attempts
+# to solve tasks using deterministic code and rules before invoking
+# large‑language models. The conditions below determine when an LLM
+# should be invoked (escalation) and when the system should fall back
+# to deterministic logic (de‑escalation).
+
+strategy:
+  mode: deterministic_first
+  escalation_criteria:
+    # If the task cannot be fully specified with simple rules or
+    # deterministic code, we may need an LLM.
+    - "Task cannot be fully specified with deterministic rules"
+    # If deterministic accuracy/recall falls below 80 %, an LLM may help.
+    - "Deterministic recall below 80 %"
+    # When the cost of building a deterministic solution exceeds the expected benefit.
+    - "Deterministic solution cost exceeds expected benefit"
+    # Free‑form text generation typically requires a language model.
+    - "Task involves generating free‑form text (e.g. summaries, outreach drafts)"
+  deescalation_criteria:
+    # If LLM output is unstable or too expensive relative to the budget.
+    - "LLM output unstable or too expensive"
+    # If there are safety incidents or hallucinations beyond tolerances.
+    - "LLM safety incidents exceed tolerances"
+    # If a deterministic alternative becomes available after initial escalation.
+    - "Deterministic alternative becomes available"
+tool_selection_rubric:
+  prefer:
+    - "Regex/DOM parsing for structured data extraction"
+    - "Sorting/filtering/grouping via standard Python functions"
+    - "Deterministic algorithms for decision making (rule‑based classifiers)"
+  use_llm_only_if:
+    - "Natural language summarisation or classification where rules are infeasible"
+    - "Generating free‑form text drafts (emails, messages) with HITL"
+    - "Unstructured web research when deterministic recall is insufficient"

@@ -1,0 +1,3 @@
+## AI-Hinweis
+
+Unsere Dienste nutzen KI-Agenten, die Aufgaben planen und Ergebnisse vorschlagen. Aktionen mit Außenwirkung (z. B. E-Mail-Versand, Deployments, Zahlungen) erfolgen ausschließlich nach menschlicher Freigabe (Human-in-the-Loop). Bitte übermitteln Sie keine sensiblen Daten, außer wo erforderlich. Sie können automatisierte Entscheidungen jederzeit anfechten oder eine menschliche Überprüfung anfordern.

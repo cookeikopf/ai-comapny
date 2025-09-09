@@ -1,0 +1,17 @@
+name: Feature Request
+description: Schlage eine neue Funktion oder Verbesserung vor
+title: "[ENH] {Kurzbeschreibung}"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: business
+    attributes:
+      label: "Business‑Ziel/KPI"
+      placeholder: "z.B. TSR +10 %, Kosten/Task –20 %, höhere Conversion"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Akzeptanzkriterien/Evals"
+      placeholder: "Definition of Done, Tests, Benchmarks"

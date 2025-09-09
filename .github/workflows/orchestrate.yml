@@ -1,0 +1,20 @@
+name: orchestrate
+on:
+  issues:
+    types:
+      - opened
+      - labeled
+jobs:
+  plan_and_delegate:
+    if: contains(github.event.issue.labels.*.name, 'task:agent')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          python -m pip install --quiet
+      - name: Run orchestrator
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/orchestrate.py --issue "$GITHUB_EVENT_PATH"
