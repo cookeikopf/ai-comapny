@@ -5,11 +5,14 @@ on:
 
 jobs:
   plan_and_delegate:
-    # Läuft, wenn das Label bereits dran ist ODER gerade gesetzt wurde
+    # laufen, wenn Label task:agent dran ist oder gerade gesetzt wurde
     if: >
       (github.event.action == 'labeled' && github.event.label.name == 'task:agent') ||
       contains(toJson(github.event.issue.labels), 'task:agent')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write      # WICHTIG: erlaubt Commit ins Repo
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -18,12 +21,18 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Installiere nur, wenn requirements.txt existiert
-      - name: Install dependencies
+      # nur, falls requirements.txt existiert
+      - name: Install dependencies (optional)
         if: hashFiles('requirements.txt') != ''
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run orchestrator
+      - name: Run orchestrator (writes reports/board/plan-*.md)
         run: python scripts/orchestrate.py
+
+      - name: Commit plan to repo
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "orchestrator: add/refresh plan for issue #${{ github.event.issue.number }}"
+          file_pattern: "reports/board/*.md"
