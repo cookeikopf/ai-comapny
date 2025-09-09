@@ -5,7 +5,7 @@ on:
 
 jobs:
   plan_and_delegate:
-    # Läuft, wenn das Issue bereits das Label hat ODER gerade gelabelt wurde
+    # nur laufen, wenn Label task:agent vorhanden ist oder gerade gesetzt wurde
     if: >
       (github.event.action == 'labeled' && github.event.label.name == 'task:agent') ||
       contains(toJson(github.event.issue.labels), 'task:agent')
@@ -18,7 +18,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Installiere nur, wenn requirements.txt existiert
       - name: Install dependencies
+        if: hashFiles('requirements.txt') != ''
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
