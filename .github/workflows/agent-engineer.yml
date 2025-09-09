@@ -1,0 +1,48 @@
+name: Agent Engineer
+on:
+  repository_dispatch:
+    types: [agent-engineer]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  engineer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read payload
+        run: |
+          echo "ISSUE_NUMBER=${{ github.event.client_payload.issue_number }}" >> $GITHUB_ENV
+          echo "PLAN_PATH=${{ github.event.client_payload.plan_path }}" >> $GITHUB_ENV
+          echo "ISSUE_TITLE=${{ github.event.client_payload.issue_title }}" >> $GITHUB_ENV
+
+      - name: Add minimal deterministic tests (idempotent)
+        run: |
+          mkdir -p tests
+          if [ ! -f tests/test_normalize_leads.py ]; then
+            cat > tests/test_normalize_leads.py << 'PY'
+import json, subprocess
+def run_csv(inp):
+  p = subprocess.run(["python","scripts/normalize_leads.py","--stdin"], input=inp.encode(), capture_output=True)
+  assert p.returncode == 0, p.stderr.decode()
+  return json.loads(p.stdout.decode())
+def test_basic_normalization():
+  csv = "Name , Email \n Alice , alice@example.com \n"
+  out = run_csv(csv)
+  assert isinstance(out, list) and len(out) == 1
+PY
+          fi
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "test(engineer): add smoke test for normalize_leads"
+          branch: "agent/engineer/issue-${{ env.ISSUE_NUMBER }}"
+          title: "Engineer: Tests/Scaffolding für #${{ env.ISSUE_NUMBER }}"
+          body: |
+            Basierend auf Plan: `${{ env.PLAN_PATH }}`
+            Closes #${{ env.ISSUE_NUMBER }} (falls passend)
+          labels: agent:engineer, ready-for-review
