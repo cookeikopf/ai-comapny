@@ -35,7 +35,7 @@ engineering:
     - commit_file
     - open_pull_request
   restricted: []
-
+deterministic_first: true
 # ----------------------------------------------------------
 # Deterministic‑first strategy and escalation guidelines
 #

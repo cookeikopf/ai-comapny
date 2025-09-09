@@ -41,30 +41,37 @@ jobs:
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
-      - name: Dispatch Engineer/Growth
+      - name: Trigger agents (repo_dispatch + workflow_dispatch fallback)
         uses: actions/github-script@v7
+        env:
+          PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
         with:
           script: |
+            const {owner, repo} = context.repo;
             const issue = context.payload.issue;
             const title = (issue.title || "").toLowerCase();
+            const ref   = context.payload.repository?.default_branch || "main";
             const wantsEngineer = /(parse|script|normalize|gate|test|engineer|pipeline)/.test(title);
             const wantsGrowth   = /(outreach|draft|growth|message|email|template)/.test(title);
             const payloadBase = {
               issue_number: issue.number,
               plan_path: process.env.PLAN_PATH || "",
-              issue_title: issue.title
+              issue_title: issue.title || ""
             };
-            if (wantsEngineer) {
-              await github.rest.repos.createDispatchEvent({
-                owner: context.repo.owner, repo: context.repo.repo,
-                event_type: 'agent-engineer', client_payload: payloadBase
-              });
+            async function fire(tag, wf) {
+              try {
+                await github.rest.repos.createDispatchEvent({ owner, repo, event_type: tag, client_payload: payloadBase });
+                console.log(`repository_dispatch ${tag} OK`);
+              } catch (e) {
+                console.log(`repository_dispatch ${tag} failed: ${e.message}`);
+              }
+              try {
+                await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: wf, ref,
+                  inputs: { issue_number: String(issue.number), plan_path: payloadBase.plan_path, issue_title: payloadBase.issue_title }});
+                console.log(`workflow_dispatch ${wf} OK`);
+              } catch (e) {
+                console.log(`workflow_dispatch ${wf} failed: ${e.message}`);
+              }
             }
-            if (wantsGrowth) {
-              await github.rest.repos.createDispatchEvent({
-                owner: context.repo.owner, repo: context.repo.repo,
-                event_type: 'agent-growth', client_payload: payloadBase
-              });
-            }
-        env:
-          PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
+            if (wantsEngineer) await fire("agent-engineer", "agent-engineer.yml");
+            if (wantsGrowth)   await fire("agent-growth",   "agent-growth.yml");
