@@ -1,37 +1,29 @@
 name: Orchestrator
-
 on:
   issues:
-    types: [labeled]   # vermeidet doppelte Runs
-
+    types: [labeled]
 concurrency:
   group: orchestrate-${{ github.event.issue.number }}
   cancel-in-progress: false
-
 permissions:
   contents: write
   issues: write
   pull-requests: write
   actions: write
-
 jobs:
   orchestrate:
     if: ${{ github.event.label.name == 'task:agent' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Run orchestrator
         id: orch
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python scripts/orchestrate.py
-
       - name: Commit plan files
         run: |
           git config user.name "github-actions[bot]"
@@ -39,18 +31,16 @@ jobs:
           git add reports/board/ || true
           git commit -m "chore(plan): add/update plan for #${{ github.event.issue.number }}" || echo "No changes"
           git push || true
-
       - name: Comment plan link on issue
         uses: actions/github-script@v7
         with:
           script: |
             const issue_number = context.payload.issue.number;
-            const planPath = process.env.PLAN_PATH || "(keine Plan-Datei gefunden)";
+            const planPath = process.env.PLAN_PATH || "(kein Plan gefunden)";
             const body = `Plan erzeugt/aktualisiert: \`${planPath}\``;
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
-
       - name: Dispatch Engineer/Growth
         uses: actions/github-script@v7
         with:
@@ -78,4 +68,3 @@ jobs:
             }
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
-
