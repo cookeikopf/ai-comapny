@@ -2,7 +2,7 @@ name: Orchestrator
 
 on:
   issues:
-    types: [labeled]   # nur wenn Label gesetzt wird
+    types: [labeled]   # vermeidet doppelte Runs
 
 concurrency:
   group: orchestrate-${{ github.event.issue.number }}
@@ -36,7 +36,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add reports/board/
+          git add reports/board/ || true
           git commit -m "chore(plan): add/update plan for #${{ github.event.issue.number }}" || echo "No changes"
           git push || true
 
@@ -45,7 +45,7 @@ jobs:
         with:
           script: |
             const issue_number = context.payload.issue.number;
-            const planPath = process.env.PLAN_PATH;
+            const planPath = process.env.PLAN_PATH || "(keine Plan-Datei gefunden)";
             const body = `Plan erzeugt/aktualisiert: \`${planPath}\``;
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
         env:
@@ -56,7 +56,7 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const title = issue.title.toLowerCase();
+            const title = (issue.title || "").toLowerCase();
             const wantsEngineer = /(parse|script|normalize|gate|test|engineer|pipeline)/.test(title);
             const wantsGrowth   = /(outreach|draft|growth|message|email|template)/.test(title);
             const payloadBase = {
@@ -78,3 +78,4 @@ jobs:
             }
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
+
