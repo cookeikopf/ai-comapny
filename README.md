@@ -21,4 +21,3 @@ Dieses Projekt verfolgt einen **Deterministic‑first, AI‑last**‑Ansatz. Auf
 
 ## Ordnerstruktur
 Siehe die Unterordner (`.github`, `agents`, `scripts`, `docs`, `kb`, `sales`, `outreach`, `finance`, `reports`, `sops`, `config`).
-test eval
