@@ -23,14 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Add deterministic outreach drafts (idempotent)
+      - name: Prepare outreach drafts (idempotent) + Ack
         run: |
           mkdir -p drafts/outreach reports/agent_runs
           if [ ! -f drafts/outreach/template.md ]; then
             cat > drafts/outreach/template.md << 'MD'
 # Outreach Draft (v1)
 
-**Zielkunden:** B2B-Leads aus Parsing-Pipeline  
+**Zielkunden:** B2B-Leads aus Parsing-Pipeline
 **CTA:** 15-min Call oder 2-Min-Demo
 
 ## Version A (Kurz)

@@ -1,0 +1,23 @@
+name: PR Auto Close Linker
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+permissions:
+  pull-requests: write
+jobs:
+  add-closes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+            const m = (pr.head.ref || "").match(/issue-(\d+)/);
+            if (!m) return;
+            const nr = m[1];
+            if (body.includes(`Closes #${nr}`)) return;
+            const newBody = body.length ? `${body}\n\nCloses #${nr}` : `Closes #${nr}`;
+            await github.rest.pulls.update({ ...context.repo, pull_number: pr.number, body: newBody });
+            core.info(`Appended 'Closes #${nr}' to PR body.`);
+
