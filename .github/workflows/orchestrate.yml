@@ -2,11 +2,11 @@ name: Orchestrator
 
 on:
   issues:
-    types: [labeled]
+    types: [opened, labeled, edited]   # <— opened hinzugefügt
 
 concurrency:
   group: orchestrate-${{ github.event.issue.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true             # <— doppelte Läufe abbrechen
 
 permissions:
   contents: write
@@ -16,7 +16,8 @@ permissions:
 
 jobs:
   orchestrate:
-    if: ${{ github.event.label.name == 'task:agent' }}
+    # nur laufen, wenn das Issue tatsächlich das Label trägt
+    if: contains(github.event.issue.labels.*.name, 'task:agent')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
