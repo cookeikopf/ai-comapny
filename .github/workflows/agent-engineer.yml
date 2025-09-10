@@ -84,6 +84,8 @@ PY
             - Automatischer Engineer-Run (Ack-Datei)
             - Falls „Deterministic/Gate“ im Titel: `config/policies.yaml`
             - Falls Parsing/Normalize: Smoke-Test scaffold
+            Closes #${{ env.ISSUE_NUMBER }}
           labels: agent:engineer, ready-for-review
           signoff: true
           delete-branch: true
+

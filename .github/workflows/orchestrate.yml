@@ -2,11 +2,22 @@ name: Orchestrator
 
 on:
   issues:
-    types: [opened, labeled, edited]   # <— opened hinzugefügt
+    types: [opened, labeled, edited]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue #
+        required: true
+      issue_title:
+        description: Issue title
+        required: true
+      issue_body:
+        description: Issue body
+        required: false
 
 concurrency:
-  group: orchestrate-${{ github.event.issue.number }}
-  cancel-in-progress: true             # <— doppelte Läufe abbrechen
+  group: orchestrate-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -16,9 +27,12 @@ permissions:
 
 jobs:
   orchestrate:
-    # nur laufen, wenn das Issue tatsächlich das Label trägt
-    if: contains(github.event.issue.labels.*.name, 'task:agent')
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'task:agent') }}
     runs-on: ubuntu-latest
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+      ISSUE_TITLE:  ${{ github.event.issue.title  || inputs.issue_title  || '' }}
+      ISSUE_BODY:   ${{ github.event.issue.body   || inputs.issue_body   || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +44,9 @@ jobs:
         id: orch
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          MANUAL_ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
+          MANUAL_ISSUE_TITLE:  ${{ env.ISSUE_TITLE }}
+          MANUAL_ISSUE_BODY:   ${{ env.ISSUE_BODY }}
         run: python scripts/orchestrate.py
 
       - name: Commit plan files
@@ -37,19 +54,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add reports/board/ || true
-          git commit -m "chore(plan): add/update plan for #${{ github.event.issue.number }}" || echo "No changes"
+          git commit -m "chore(plan): add/update plan for #${ISSUE_NUMBER}" || echo "No changes"
           git push || true
 
       - name: Comment plan link on issue
         uses: actions/github-script@v7
+        env:
+          PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
+          ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
         with:
           script: |
-            const issue_number = context.payload.issue.number;
+            const issue_number = parseInt(process.env.ISSUE_NUMBER,10);
             const planPath = process.env.PLAN_PATH || "(kein Plan gefunden)";
             const body = `Plan erzeugt/aktualisiert: \`${planPath}\``;
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
-        env:
-          PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
 
 
       - name: Trigger agents (repo_dispatch + workflow_dispatch + check)
@@ -57,10 +75,12 @@ jobs:
         uses: actions/github-script@v7
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
+          ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
+          ISSUE_TITLE: ${{ env.ISSUE_TITLE }}
         with:
           script: |
             const {owner, repo} = context.repo;
-            const issue = context.payload.issue;
+            const issue = { number: parseInt(process.env.ISSUE_NUMBER,10), title: process.env.ISSUE_TITLE || '' };
             const title = (issue.title || "").toLowerCase();
             const ref   = context.payload.repository?.default_branch || "main";
 
@@ -163,9 +183,9 @@ MD
 Deterministische Vorlagen. Keine PII/Secrets. Änderungen per PR.
 MD
           fi
-          FILE="reports/agent_runs/growth-fallback-issue-${{ github.event.issue.number }}.md"
+          FILE="reports/agent_runs/growth-fallback-issue-${ISSUE_NUMBER}.md"
           if [ ! -f "$FILE" ]; then
-            echo "# Growth fallback for Issue #${{ github.event.issue.number }}" > "$FILE"
+            echo "# Growth fallback for Issue #${ISSUE_NUMBER}" > "$FILE"
             echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"
           fi
 
@@ -173,12 +193,13 @@ MD
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "feat(growth): fallback outreach drafts for issue #${{ github.event.issue.number }}"
-          branch: "agent/growth/issue-${{ github.event.issue.number }}"
-          title: "Growth: Fallback-Drafts für #${{ github.event.issue.number }}"
+          commit-message: "feat(growth): fallback outreach drafts for issue #${{ env.ISSUE_NUMBER }}"
+          branch: "agent/growth/issue-${{ env.ISSUE_NUMBER }}"
+          title: "Growth: Fallback-Drafts für #${{ env.ISSUE_NUMBER }}"
           body: |
             Plan: `${{ steps.orch.outputs.plan_path }}`
             Automatischer Fallback, da Growth-Dispatch nicht erkannt wurde.
+            Closes #${{ env.ISSUE_NUMBER }}
           labels: agent:growth, ready-for-review
           signoff: true
           delete-branch: true
@@ -192,9 +213,9 @@ MD
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
         run: |
           mkdir -p reports/agent_runs
-          FILE="reports/agent_runs/orchestrator-fallback-issue-${{ github.event.issue.number }}.md"
+          FILE="reports/agent_runs/orchestrator-fallback-issue-${ISSUE_NUMBER}.md"
           if [ ! -f "$FILE" ]; then
-            echo "# Orchestrator fallback for Issue #${{ github.event.issue.number }}" > "$FILE"
+            echo "# Orchestrator fallback for Issue #${ISSUE_NUMBER}" > "$FILE"
             echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"
           fi
 
@@ -202,12 +223,14 @@ MD
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "chore(fallback): orchestrator PR for issue #${{ github.event.issue.number }}"
-          branch: "agent/fallback/issue-${{ github.event.issue.number }}"
-          title: "Fallback PR für #${{ github.event.issue.number }}"
+          commit-message: "chore(fallback): orchestrator PR for issue #${{ env.ISSUE_NUMBER }}"
+          branch: "agent/fallback/issue-${{ env.ISSUE_NUMBER }}"
+          title: "Fallback PR für #${{ env.ISSUE_NUMBER }}"
           body: |
             Plan: `${{ steps.orch.outputs.plan_path }}`
             Dispatch zu Agenten fehlgeschlagen – Fallback-PR erstellt.
+            Closes #${{ env.ISSUE_NUMBER }}
           labels: agent:engineer, ready-for-review
           signoff: true
           delete-branch: true
+

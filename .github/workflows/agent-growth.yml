@@ -66,6 +66,8 @@ MD
             - `drafts/outreach/template.md` (idempotent)
             - `drafts/README.md` (idempotent)
             - Ack-Datei für Nachvollziehbarkeit
+            Closes #${{ env.ISSUE_NUMBER }}
           labels: agent:growth, ready-for-review
           signoff: true
           delete-branch: true
+
