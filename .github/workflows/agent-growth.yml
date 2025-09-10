@@ -25,7 +25,7 @@ jobs:
         with: { fetch-depth: 0 }
       - name: Add deterministic outreach drafts (idempotent)
         run: |
-          mkdir -p drafts/outreach
+          mkdir -p drafts/outreach reports/agent_runs
           if [ ! -f drafts/outreach/template.md ]; then
             cat > drafts/outreach/template.md << 'MD'
 # Outreach Draft (v1)
@@ -50,6 +50,11 @@ MD
 Deterministische Vorlagen. Keine PII/Secrets. Änderungen per PR.
 MD
           fi
+          ACK="reports/agent_runs/growth-issue-${ISSUE_NUMBER}.md"
+          if [ ! -f "$ACK" ]; then
+            echo "# Growth run for Issue #${ISSUE_NUMBER}" > "$ACK"
+            echo "Plan: ${PLAN_PATH}" >> "$ACK"
+          fi
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
         with:
@@ -58,8 +63,9 @@ MD
           title: "Growth: Outreach-Drafts für #${{ env.ISSUE_NUMBER }}"
           body: |
             Basierend auf Plan: `${{ env.PLAN_PATH }}`
-            - `drafts/outreach/template.md`
-            - `drafts/README.md`
+            - `drafts/outreach/template.md` (idempotent)
+            - `drafts/README.md` (idempotent)
+            - Ack-Datei für Nachvollziehbarkeit
           labels: agent:growth, ready-for-review
           signoff: true
           delete-branch: true
