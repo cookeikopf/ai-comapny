@@ -50,6 +50,7 @@ jobs:
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
 
+
       - name: Trigger agents (repo_dispatch + workflow_dispatch + check)
         id: dispatch
         uses: actions/github-script@v7
@@ -72,7 +73,7 @@ jobs:
             const payloadBase = {
               issue_number: issue.number,
               plan_path: process.env.PLAN_PATH || "",
-              issue_title: issue.title || ""
+              issue_title: issue.title || "",
             };
 
             async function dispatchAndWait(tag, wfPath, waitSeconds) {
@@ -98,7 +99,6 @@ jobs:
               } catch (e) {
                 console.log(`workflow_dispatch ${wfPath} failed: ${e.message}`);
               }
-              // poll für neuen Run (bis 20s)
               const endBy = Date.now() + (waitSeconds * 1000);
               while (Date.now() < endBy) {
                 try {
@@ -118,20 +118,77 @@ jobs:
               return false;
             }
 
-            let engineerRun = true;
-            if (fireEngineer) engineerRun = await dispatchAndWait("agent-engineer", ".github/workflows/agent-engineer.yml", 20);
-            if (fireGrowth)   await dispatchAndWait("agent-growth",   ".github/workflows/agent-growth.yml",   20);
+            let ENGINEER_OK = true;
+            if (fireEngineer) ENGINEER_OK = await dispatchAndWait("agent-engineer", ".github/workflows/agent-engineer.yml", 20);
+            let GROWTH_OK = true;
+            if (fireGrowth)   GROWTH_OK   = await dispatchAndWait("agent-growth",   ".github/workflows/agent-growth.yml",   20);
 
-            core.setOutput("NEED_FALLBACK", engineerRun ? "false" : "true");
+            core.setOutput("ENGINEER_OK", ENGINEER_OK ? "true" : "false");
+            core.setOutput("GROWTH_OK",   GROWTH_OK   ? "true" : "false");
+            core.setOutput("NEED_FALLBACK_ENGINEER", ENGINEER_OK ? "false" : "true");
+            core.setOutput("NEED_FALLBACK_GROWTH",   GROWTH_OK   ? "false" : "true");
 
+      - name: Prepare growth fallback
+        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Write growth fallback files
+        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
+        run: |
+          mkdir -p drafts/outreach reports/agent_runs
+          if [ ! -f drafts/outreach/template.md ]; then
+            cat > drafts/outreach/template.md << 'MD'
+# Outreach Draft (v1)
+
+**Zielkunden:** B2B-Leads aus Parsing-Pipeline  
+**CTA:** 15-min Call oder 2-Min-Demo
+
+## Version A (Kurz)
+Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}} Minuten automatisiert.
+Darf ich dir in 2 Screens zeigen, wie?
+
+## Version B (Value-first)
+Hey {{first_name}}, mir ist bei {{company}} aufgefallen: {{trigger}}.
+Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-Min-Demo schicken?
+
+— {{sender}}
+MD
+          fi
+          if [ ! -f drafts/README.md ]; then
+            cat > drafts/README.md << 'MD'
+# Drafts
+Deterministische Vorlagen. Keine PII/Secrets. Änderungen per PR.
+MD
+          fi
+          FILE="reports/agent_runs/growth-fallback-issue-${{ github.event.issue.number }}.md"
+          if [ ! -f "$FILE" ]; then
+            echo "# Growth fallback for Issue #${{ github.event.issue.number }}" > "$FILE"
+            echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"
+          fi
+
+      - name: Fallback PR (Growth)
+        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "feat(growth): fallback outreach drafts for issue #${{ github.event.issue.number }}"
+          branch: "agent/growth/issue-${{ github.event.issue.number }}"
+          title: "Growth: Fallback-Drafts für #${{ github.event.issue.number }}"
+          body: |
+            Plan: `${{ steps.orch.outputs.plan_path }}`
+            Automatischer Fallback, da Growth-Dispatch nicht erkannt wurde.
+          labels: agent:growth, ready-for-review
+          signoff: true
+          delete-branch: true
       - name: Prepare fallback
-        if: ${{ steps.dispatch.outputs.NEED_FALLBACK == 'true' }}
+        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Write fallback file
-        if: ${{ steps.dispatch.outputs.NEED_FALLBACK == 'true' }}
+        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
         run: |
           mkdir -p reports/agent_runs
           FILE="reports/agent_runs/orchestrator-fallback-issue-${{ github.event.issue.number }}.md"
@@ -141,7 +198,7 @@ jobs:
           fi
 
       - name: Fallback PR (Engineer)
-        if: ${{ steps.dispatch.outputs.NEED_FALLBACK == 'true' }}
+        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
         uses: peter-evans/create-pull-request@v6
         with:
           commit-message: "chore(fallback): orchestrator PR for issue #${{ github.event.issue.number }}"
