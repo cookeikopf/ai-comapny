@@ -1,29 +1,36 @@
 name: Orchestrator
+
 on:
   issues:
     types: [labeled]
+
 concurrency:
   group: orchestrate-${{ github.event.issue.number }}
   cancel-in-progress: false
+
 permissions:
   contents: write
   issues: write
   pull-requests: write
   actions: write
+
 jobs:
   orchestrate:
     if: ${{ github.event.label.name == 'task:agent' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Run orchestrator
         id: orch
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: python scripts/orchestrate.py
+
       - name: Commit plan files
         run: |
           git config user.name "github-actions[bot]"
@@ -31,6 +38,7 @@ jobs:
           git add reports/board/ || true
           git commit -m "chore(plan): add/update plan for #${{ github.event.issue.number }}" || echo "No changes"
           git push || true
+
       - name: Comment plan link on issue
         uses: actions/github-script@v7
         with:
@@ -41,6 +49,7 @@ jobs:
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
+
       - name: Trigger agents (repo_dispatch + workflow_dispatch + check)
         id: dispatch
         uses: actions/github-script@v7
@@ -51,44 +60,76 @@ jobs:
             const {owner, repo} = context.repo;
             const issue = context.payload.issue;
             const title = (issue.title || "").toLowerCase();
-            const ref = context.payload.repository?.default_branch || "main";
+            const ref   = context.payload.repository?.default_branch || "main";
+
             const wantsEngineer = /(parse|script|normalize|gate|test|engineer|pipeline)/.test(title);
             const wantsGrowth   = /(outreach|draft|growth|message|email|template)/.test(title);
+
+            // Fallback: wenn nichts erkannt → Engineer feuern
             const fireEngineer  = wantsEngineer || (!wantsEngineer && !wantsGrowth);
             const fireGrowth    = wantsGrowth;
+
             const payloadBase = {
               issue_number: issue.number,
               plan_path: process.env.PLAN_PATH || "",
               issue_title: issue.title || ""
             };
-            async function dispatchAndWait(tag, wfPath, waitForRun) {
-              const start = new Date();
-              try { await github.rest.repos.createDispatchEvent({ owner, repo, event_type: tag, client_payload: payloadBase }); }
-              catch (e) { console.log(`repository_dispatch ${tag} failed: ${e.message}`); }
+
+            async function dispatchAndWait(tag, wfPath, waitSeconds) {
+              const start = Date.now();
+              try {
+                await github.rest.repos.createDispatchEvent({
+                  owner, repo, event_type: tag, client_payload: payloadBase
+                });
+                console.log(`repository_dispatch ${tag} OK`);
+              } catch (e) {
+                console.log(`repository_dispatch ${tag} failed: ${e.message}`);
+              }
               try {
                 await github.rest.actions.createWorkflowDispatch({
                   owner, repo, workflow_id: wfPath, ref,
-                  inputs: { issue_number: String(issue.number), plan_path: payloadBase.plan_path, issue_title: payloadBase.issue_title }
+                  inputs: {
+                    issue_number: String(issue.number),
+                    plan_path: payloadBase.plan_path,
+                    issue_title: payloadBase.issue_title
+                  }
                 });
-              } catch (e) { console.log(`workflow_dispatch ${wfPath} failed: ${e.message}`); return false; }
-              if (!waitForRun) return true;
-              for (let i=0; i<20; i++) {
+                console.log(`workflow_dispatch ${wfPath} OK`);
+              } catch (e) {
+                console.log(`workflow_dispatch ${wfPath} failed: ${e.message}`);
+              }
+              // poll für neuen Run (bis 20s)
+              const endBy = Date.now() + (waitSeconds * 1000);
+              while (Date.now() < endBy) {
+                try {
+                  const runs = await github.rest.actions.listWorkflowRuns({
+                    owner, repo, workflow_id: wfPath, event: "workflow_dispatch", per_page: 1
+                  });
+                  const run = runs.data.workflow_runs?.[0];
+                  if (run && new Date(run.created_at).getTime() >= start) {
+                    console.log(`Detected run for ${wfPath}: ${run.html_url}`);
+                    return true;
+                  }
+                } catch (e) {
+                  console.log(`listWorkflowRuns ${wfPath} failed: ${e.message}`);
+                }
                 await new Promise(r => setTimeout(r, 1000));
-                const runs = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: wfPath, event: "workflow_dispatch", per_page: 1 });
-                const run = runs.data.workflow_runs[0];
-                if (run && new Date(run.created_at) > start) return true;
               }
               return false;
             }
+
             let engineerRun = true;
-            if (fireEngineer) engineerRun = await dispatchAndWait("agent-engineer", ".github/workflows/agent-engineer.yml", true);
-            if (fireGrowth)   await dispatchAndWait("agent-growth",   ".github/workflows/agent-growth.yml", true);
+            if (fireEngineer) engineerRun = await dispatchAndWait("agent-engineer", ".github/workflows/agent-engineer.yml", 20);
+            if (fireGrowth)   await dispatchAndWait("agent-growth",   ".github/workflows/agent-growth.yml",   20);
+
             core.setOutput("NEED_FALLBACK", engineerRun ? "false" : "true");
+
       - name: Prepare fallback
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK == 'true' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Write fallback file
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK == 'true' }}
         run: |
@@ -98,6 +139,7 @@ jobs:
             echo "# Orchestrator fallback for Issue #${{ github.event.issue.number }}" > "$FILE"
             echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"
           fi
+
       - name: Fallback PR (Engineer)
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK == 'true' }}
         uses: peter-evans/create-pull-request@v6
@@ -107,7 +149,7 @@ jobs:
           title: "Fallback PR für #${{ github.event.issue.number }}"
           body: |
             Plan: `${{ steps.orch.outputs.plan_path }}`
-            Dispatch zu Agenten fehlgeschlagen.
+            Dispatch zu Agenten fehlgeschlagen – Fallback-PR erstellt.
           labels: agent:engineer, ready-for-review
           signoff: true
           delete-branch: true

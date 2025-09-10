@@ -1,29 +1,45 @@
 import os, json, datetime, pathlib, traceback, re
+
 def yaml_escape(s: str) -> str:
     return (s or "").replace("\\", "\\\\").replace('"', '\\"')
+
 def main():
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if not event_path or not os.path.exists(event_path):
         print("[orchestrate] ERROR: GITHUB_EVENT_PATH missing or file not found"); return 0
+
     with open(event_path, "r", encoding="utf-8") as f:
         event = json.load(f)
+
     issue = event.get("issue") or {}
     num   = issue.get("number")
     title = (issue.get("title") or "").strip()
     body  = (issue.get("body") or "").strip()
+
     if not isinstance(num, int):
         print("[orchestrate] ERROR: issue.number not found"); return 0
+
     pathlib.Path("reports/board").mkdir(parents=True, exist_ok=True)
+
     existing = sorted(pathlib.Path("reports/board").glob(f"plan-{num}-*.md"))
     if existing:
-        plan_path = str(existing[-1]); should_write = False
+        plan_path = str(existing[-1])
+        should_write = False
     else:
         ts = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        plan_path = f"reports/board/plan-{num}-{ts}.md"; should_write = True
+        plan_path = f"reports/board/plan-{num}-{ts}.md"
+        should_write = True
+
     if should_write:
-        fm = ["---", f"issue: {num}", f'title: "{yaml_escape(title)}"', "deterministic_first: true",
-              "owner: orchestrator", "agents: [engineer, growth]",
-              f"created_utc: {datetime.datetime.utcnow().strftime('%Y%m%d-%H%M%S')}", "---", ""]
+        fm = ["---",
+              f"issue: {num}",
+              f'title: "{yaml_escape(title)}"',
+              "deterministic_first: true",
+              "owner: orchestrator",
+              "agents: [engineer, growth]",
+              f"created_utc: {datetime.datetime.utcnow().strftime('%Y%m%d-%H%M%S')}",
+              "---",
+              ""]
         md = f"""# Plan für Issue #{num}: {title}
 
 ## Kontext
@@ -38,22 +54,32 @@ def main():
 - [ ] Engineer (Code/Tests)
 - [ ] Growth (Outreach-Drafts)
 """
-        with open(plan_path, "w", encoding="utf-8") as f: f.write("\n".join(fm) + md)
-    title_lc = title.lower()
-    wants_engineer = bool(re.search("(parse|script|normalize|gate|test|engineer|pipeline)", title_lc))
-    wants_growth = bool(re.search("(outreach|draft|growth|message|email|template)", title_lc))
-    fire_engineer = wants_engineer or (not wants_engineer and not wants_growth)
-    fire_growth = wants_growth
+        with open(plan_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(fm) + md)
+
+    # einfache Heuristik (nur Log, tatsächliches Dispatching macht der Workflow)
+    title_lc = (title or "").lower()
+    wants_engineer = bool(re.search(r"(parse|script|normalize|gate|test|engineer|pipeline)", title_lc))
+    wants_growth   = bool(re.search(r"(outreach|draft|growth|message|email|template)", title_lc))
+    fire_engineer  = wants_engineer or (not wants_engineer and not wants_growth)
+    fire_growth    = wants_growth
+
     gh_out = os.environ.get("GITHUB_OUTPUT")
     if gh_out:
-        with open(gh_out, "a", encoding="utf-8") as f: f.write(f"plan_path={plan_path}\n")
+        with open(gh_out, "a", encoding="utf-8") as f:
+            f.write(f"plan_path={plan_path}\n")
+
     print(f"DISPATCH: engineer={fire_engineer} growth={fire_growth} plan={plan_path}")
-    print(f"[orchestrate] plan_path={plan_path}"); return 0
+    print(f"[orchestrate] plan_path={plan_path}")
+    return 0
+
 if __name__ == "__main__":
-    try: raise SystemExit(main())
+    try:
+        raise SystemExit(main())
     except Exception:
         print("[orchestrate] FATAL:\n" + traceback.format_exc())
         gh_out = os.environ.get("GITHUB_OUTPUT")
         if gh_out:
-            with open(gh_out, "a", encoding="utf-8") as f: f.write("plan_path=reports/board/plan-error.txt\n")
+            with open(gh_out, "a", encoding="utf-8") as f:
+                f.write("plan_path=reports/board/plan-error.txt\n")
         raise SystemExit(0)
