@@ -53,25 +53,22 @@ jobs:
             const ref   = context.payload.repository?.default_branch || "main";
             const wantsEngineer = /(parse|script|normalize|gate|test|engineer|pipeline)/.test(title);
             const wantsGrowth   = /(outreach|draft|growth|message|email|template)/.test(title);
+            const fireEngineer  = wantsEngineer || (!wantsEngineer && !wantsGrowth);
+            const fireGrowth    = wantsGrowth;
             const payloadBase = {
               issue_number: issue.number,
               plan_path: process.env.PLAN_PATH || "",
               issue_title: issue.title || ""
             };
             async function fire(tag, wf) {
+              try { await github.rest.repos.createDispatchEvent({ owner, repo, event_type: tag, client_payload: payloadBase }); }
+              catch (e) { console.log(`repository_dispatch ${tag} failed: ${e.message}`); }
               try {
-                await github.rest.repos.createDispatchEvent({ owner, repo, event_type: tag, client_payload: payloadBase });
-                console.log(`repository_dispatch ${tag} OK`);
-              } catch (e) {
-                console.log(`repository_dispatch ${tag} failed: ${e.message}`);
-              }
-              try {
-                await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: wf, ref,
-                  inputs: { issue_number: String(issue.number), plan_path: payloadBase.plan_path, issue_title: payloadBase.issue_title }});
-                console.log(`workflow_dispatch ${wf} OK`);
-              } catch (e) {
-                console.log(`workflow_dispatch ${wf} failed: ${e.message}`);
-              }
+                await github.rest.actions.createWorkflowDispatch({
+                  owner, repo, workflow_id: wf, ref,
+                  inputs: { issue_number: String(issue.number), plan_path: payloadBase.plan_path, issue_title: payloadBase.issue_title }
+                });
+              } catch (e) { console.log(`workflow_dispatch ${wf} failed: ${e.message}`); }
             }
-            if (wantsEngineer) await fire("agent-engineer", "agent-engineer.yml");
-            if (wantsGrowth)   await fire("agent-growth",   "agent-growth.yml");
+            if (fireEngineer) await fire("agent-engineer", "agent-engineer.yml");
+            if (fireGrowth)   await fire("agent-growth",   "agent-growth.yml");

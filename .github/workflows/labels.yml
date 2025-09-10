@@ -1,8 +1,7 @@
 name: Sync labels
 on:
   push:
-    paths:
-      - .github/labels.yml
+    paths: [".github/labels.yml"]
   workflow_dispatch: {}
 permissions:
   issues: write

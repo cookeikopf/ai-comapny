@@ -11,9 +11,7 @@ body:
     id: context
     attributes:
       label: Kontext/Constraints
-      placeholder: Links, Dateien, Risiken
   - type: textarea
     id: acceptance
     attributes:
       label: Akzeptanzkriterien/Eval
-      placeholder: Nachweis, Tests, Definition of Done
