@@ -12,12 +12,19 @@ def main():
         event = json.load(f)
 
     issue = event.get("issue") or {}
-    num   = issue.get("number")
+    if not issue:
+        issue = {
+            "number": os.environ.get("MANUAL_ISSUE_NUMBER"),
+            "title": os.environ.get("MANUAL_ISSUE_TITLE"),
+            "body": os.environ.get("MANUAL_ISSUE_BODY"),
+        }
+    num_raw = issue.get("number")
+    try:
+        num = int(num_raw)
+    except (TypeError, ValueError):
+        print("[orchestrate] ERROR: issue.number not found"); return 0
     title = (issue.get("title") or "").strip()
     body  = (issue.get("body") or "").strip()
-
-    if not isinstance(num, int):
-        print("[orchestrate] ERROR: issue.number not found"); return 0
 
     pathlib.Path("reports/board").mkdir(parents=True, exist_ok=True)
 
@@ -83,3 +90,4 @@ if __name__ == "__main__":
             with open(gh_out, "a", encoding="utf-8") as f:
                 f.write("plan_path=reports/board/plan-error.txt\n")
         raise SystemExit(0)
+

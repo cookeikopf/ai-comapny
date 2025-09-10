@@ -27,3 +27,14 @@ Siehe die Unterordner (`.github`, `agents`, `scripts`, `docs`, `kb`, `sales`, `o
 - **Engineer** ergänzt Tests/Policies/Ack und öffnet PR. **Growth** erstellt Drafts/Ack und öffnet PR.
 - Du reviewst & mergest (HITL). Branches werden nach Merge gelöscht.
 - Secret Scan (soft) + bestehende Eval laufen als Checks.
+
+## How to trigger & merge (HITL)
+1. Issue mit Label `task:agent` öffnen oder labeln – oder `workflow_dispatch` im Orchestrator nutzen.
+2. Orchestrator kommentiert den Plan-Link und startet Agenten bzw. erstellt Fallback‑PRs.
+3. PRs prüfen, `eval`‑Status abwarten und manuell mergen. Jeder PR enthält `Closes #<nr>`.
+
+## Troubleshooting
+- **Queued Runs:** Repo‑Minuten aufgebraucht oder Sichtbarkeit zu gering. Manuell via `workflow_dispatch` erneut starten.
+- **Permissions:** Bei Forks `pull_request_target` nutzen. GITHUB_TOKEN muss `contents`/`pull-requests`/`issues` Rechte haben.
+- **Labels fehlen:** Workflow `Sync labels` laufen lassen und sicherstellen, dass Issues das Label `task:agent` tragen.
+
