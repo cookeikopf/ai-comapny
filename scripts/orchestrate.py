@@ -1,10 +1,6 @@
-import os, json, datetime, pathlib, traceback
-
-
+import os, json, datetime, pathlib, traceback, re
 def yaml_escape(s: str) -> str:
     return (s or "").replace("\\", "\\\\").replace('"', '\\"')
-
-
 def main():
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if not event_path or not os.path.exists(event_path):
@@ -43,15 +39,18 @@ def main():
 - [ ] Growth (Outreach-Drafts)
 """
         with open(plan_path, "w", encoding="utf-8") as f: f.write("\n".join(fm) + md)
+    title_lc = title.lower()
+    wants_engineer = bool(re.search("(parse|script|normalize|gate|test|engineer|pipeline)", title_lc))
+    wants_growth = bool(re.search("(outreach|draft|growth|message|email|template)", title_lc))
+    fire_engineer = wants_engineer or (not wants_engineer and not wants_growth)
+    fire_growth = wants_growth
     gh_out = os.environ.get("GITHUB_OUTPUT")
     if gh_out:
         with open(gh_out, "a", encoding="utf-8") as f: f.write(f"plan_path={plan_path}\n")
+    print(f"DISPATCH: engineer={fire_engineer} growth={fire_growth} plan={plan_path}")
     print(f"[orchestrate] plan_path={plan_path}"); return 0
-
-
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
+    try: raise SystemExit(main())
     except Exception:
         print("[orchestrate] FATAL:\n" + traceback.format_exc())
         gh_out = os.environ.get("GITHUB_OUTPUT")

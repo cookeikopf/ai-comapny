@@ -3,5 +3,7 @@
   description: Orchestrator triggers agents
 - name: agent:engineer
   color: 0e8a16
+  description: Engineer agent PRs
 - name: agent:growth
   color: 1d76db
+  description: Growth agent PRs

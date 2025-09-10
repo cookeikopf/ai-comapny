@@ -23,9 +23,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Ensure deterministic test scaffolding (idempotent)
+      - name: Decide mode & prepare changes (always create a diff)
+        shell: bash
         run: |
-          mkdir -p tests
+          set -e
+          mkdir -p config reports/agent_runs tests
+          TITLE_LC="$(echo "${ISSUE_TITLE}" | tr '[:upper:]' '[:lower:]')"
+          if echo "$TITLE_LC" | grep -Eiq "(deterministic|gate)"; then
+            echo "MODE=policy" >> $GITHUB_ENV
+            if [ ! -f config/policies.yaml ]; then
+              cat > config/policies.yaml << 'YAML'
+deterministic_first: true
+llm_escalation: gated
+YAML
+            fi
+            if [ -f README.md ] && ! grep -q "How it works (ai-company)" README.md; then
+              printf "\n\n### How it works (ai-company)\nOrchestrator → Agents → PR → HITL.\n" >> README.md
+            fi
+          else
+            echo "MODE=tests" >> $GITHUB_ENV
+          fi
+          ACK="reports/agent_runs/engineer-issue-${ISSUE_NUMBER}.md"
+          if [ ! -f "$ACK" ]; then
+            echo "# Engineer run for Issue #${ISSUE_NUMBER}" > "$ACK"
+            echo "Plan: ${PLAN_PATH}" >> "$ACK"
+          fi
+      - name: Ensure test scaffolding (only for parsing/normalize tasks)
+        if: ${{ env.MODE == 'tests' }}
+        run: |
           if [ ! -f tests/test_normalize_leads.py ]; then
             cat > tests/test_normalize_leads.py << 'PY'
 import json, subprocess
@@ -43,19 +68,22 @@ PY
         with: { python-version: '3.11' }
       - run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest
+          python -m pip install pytest || true
       - name: Quick local test (non-blocking)
         continue-on-error: true
-        run: pytest -q || true
+        run: |
+          if [ -f tests/test_normalize_leads.py ]; then pytest -q || true; else echo "no tests yet"; fi
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "test(engineer): add/ensure smoke tests for normalize_leads"
+          commit-message: "chore(engineer): initialize changes for Issue #${{ env.ISSUE_NUMBER }}"
           branch: "agent/engineer/issue-${{ env.ISSUE_NUMBER }}"
-          title: "Engineer: Tests/Scaffolding für #${{ env.ISSUE_NUMBER }}"
+          title: "Engineer: Änderungen für #${{ env.ISSUE_NUMBER }}"
           body: |
             Basierend auf Plan: `${{ env.PLAN_PATH }}`
-            - Smoke-Test für `scripts/normalize_leads.py` (idempotent)
+            - Automatischer Engineer-Run (Ack-Datei)
+            - Falls „Deterministic/Gate“ im Titel: `config/policies.yaml`
+            - Falls Parsing/Normalize: Smoke-Test scaffold
           labels: agent:engineer, ready-for-review
           signoff: true
           delete-branch: true
