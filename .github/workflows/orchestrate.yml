@@ -2,8 +2,8 @@ name: Orchestrator
 
 on:
   issues:
-    types: [opened, labeled, edited]   # reagiert auch auf vor-gelabelte Issues
-  workflow_dispatch:                   # manueller Start aus Actions
+    types: [opened, labeled, edited]
+  workflow_dispatch:
     inputs:
       issue_number:
         description: "Issue number to orchestrate"
