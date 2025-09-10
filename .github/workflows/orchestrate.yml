@@ -21,8 +21,8 @@ permissions:
 
 jobs:
   orchestrate:
-    # Nur laufen, wenn das Issue das Label 'task:agent' trägt (bei dispatch holen wir das Issue vorher)
-    if: ${{ (github.event_name == 'workflow_dispatch') || contains(github.event.issue.labels.*.name, 'task:agent') }}
+    # Läuft auf Issue-Events sowie manuellen dispatches; Label wird später geprüft
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'issues' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,17 +49,32 @@ jobs:
             core.setOutput('event_path', p)
         id: synth
 
+      - name: Ensure label 'task:agent'
+        id: labelcheck
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const issue_number = context.eventName === 'workflow_dispatch'
+              ? Number(core.getInput('issue_number'))
+              : context.payload.issue.number;
+            const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number });
+            return (issue.labels || []).some(l => (l.name || l) === 'task:agent') ? 'true' : 'false';
+
       - uses: actions/setup-python@v5
+        if: ${{ steps.labelcheck.outputs.result == 'true' }}
         with:
           python-version: '3.11'
 
       - name: Run orchestrator
+        if: ${{ steps.labelcheck.outputs.result == 'true' }}
         id: orch
         env:
           GITHUB_EVENT_PATH: ${{ github.event_name == 'workflow_dispatch' && steps.synth.outputs.event_path || github.event_path }}
         run: python scripts/orchestrate.py
 
       - name: Commit plan files
+        if: ${{ steps.labelcheck.outputs.result == 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -68,6 +83,7 @@ jobs:
           git push || true
 
       - name: Comment plan link on issue
+        if: ${{ steps.labelcheck.outputs.result == 'true' }}
         uses: actions/github-script@v7
         env:
           PLAN_PATH: ${{ steps.orch.outputs.plan_path }}
@@ -83,6 +99,7 @@ jobs:
       # Dispatch der Agenten mit Fallback-Erkennung (Engineer & Growth); diese Steps
       # darfst du unverändert lassen, falls du sie schon ähnlich hast — Hauptsache sie laufen.
       - name: Trigger agents (repo_dispatch + workflow_dispatch + detection)
+        if: ${{ steps.labelcheck.outputs.result == 'true' }}
         id: dispatch
         uses: actions/github-script@v7
         env:
@@ -137,9 +154,10 @@ jobs:
 
             let engineerOk = true;
             let growthOk = true;
-            if (fireEngineer) engineerOk = await dispatchAndWait("agent-engineer", ".github/workflows/agent-engineer.yml", 15);
-            if (fireGrowth)   growthOk   = await dispatchAndWait("agent-growth",   ".github/workflows/agent-growth.yml",   15);
+            if (fireEngineer) engineerOk = await dispatchAndWait("agent-engineer", "agent-engineer.yml", 15);
+            if (fireGrowth)   growthOk   = await dispatchAndWait("agent-growth",   "agent-growth.yml",   15);
 
+            core.info(`RUN DETECTED: engineer=${engineerOk} growth=${growthOk}`);
             core.setOutput("NEED_FALLBACK_ENGINEER", engineerOk ? "false" : "true");
             core.setOutput("NEED_FALLBACK_GROWTH",   growthOk   ? "false" : "true");
 
@@ -169,6 +187,7 @@ jobs:
           body: |
             Plan: `${{ steps.orch.outputs.plan_path }}`
             Automatischer Engineer-Fallback, da Agent-Dispatch nicht erkannt wurde.
+            Closes #${{ github.event_name == 'workflow_dispatch' && inputs.issue_number || github.event.issue.number }}
           labels: agent:engineer, ready-for-review
           signoff: true
           delete-branch: true
@@ -216,6 +235,7 @@ MD
           body: |
             Plan: `${{ steps.orch.outputs.plan_path }}`
             Automatischer Growth-Fallback, da Agent-Dispatch nicht erkannt wurde.
+            Closes #${{ github.event_name == 'workflow_dispatch' && inputs.issue_number || github.event.issue.number }}
           labels: agent:growth, ready-for-review
           signoff: true
           delete-branch: true

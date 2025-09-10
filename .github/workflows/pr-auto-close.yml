@@ -2,6 +2,7 @@ name: PR Auto Close Linker
 on:
   pull_request_target:
     types: [opened, edited, synchronize]
+  workflow_dispatch: {}
 permissions:
   pull-requests: write
 jobs:

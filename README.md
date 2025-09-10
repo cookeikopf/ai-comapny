@@ -38,3 +38,10 @@ Siehe die Unterordner (`.github`, `agents`, `scripts`, `docs`, `kb`, `sales`, `o
 - **Permissions:** Bei Forks `pull_request_target` nutzen. GITHUB_TOKEN muss `contents`/`pull-requests`/`issues` Rechte haben.
 - **Labels fehlen:** Workflow `Sync labels` laufen lassen und sicherstellen, dass Issues das Label `task:agent` tragen.
 
+## E2E-Testplan
+1. Neues Issue mit Label `task:agent` öffnen (oder vorhandenes labeln).
+2. Orchestrator kommentiert den Plan-Link und triggert Agenten.
+3. Falls kein Agent-Run erkannt wird, erstellt der Orchestrator Fallback-PRs mit Ack-Dateien.
+4. `eval`-Workflow läuft und setzt Commit-Status `eval`.
+5. Nach grünem Status manuell mergen – der PR enthält `Closes #<nr>` und schließt das Issue.
+

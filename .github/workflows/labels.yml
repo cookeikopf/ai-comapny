@@ -18,6 +18,5 @@ jobs:
         with:
           manifest: .github/labels.yml
           repository: ${{ github.repository }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
