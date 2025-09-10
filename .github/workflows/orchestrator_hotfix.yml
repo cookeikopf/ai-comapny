@@ -1,0 +1,35 @@
+name: Orchestrator HOTFIX (signal)
+
+on:
+  issues:
+    types: [opened, edited, labeled, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to ping"
+        required: true
+
+permissions:
+  issues: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine issue number
+        id: num
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "issue=${{ inputs.issue_number }}" >> $GITHUB_OUTPUT
+          else
+            echo "issue=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Comment so we know it fired
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = Number("${{ steps.num.outputs.issue }}");
+            const evt = context.eventName;
+            const typ = (context.payload.action || "n/a");
+            const body = `👋 HOTFIX ping: event=\`${evt}\` action=\`${typ}\` at ${new Date().toISOString()}`;
+            await github.rest.issues.createComment({ ...context.repo, issue_number, body });
