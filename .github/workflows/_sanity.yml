@@ -1,0 +1,13 @@
+name: _SANITY
+
+on:
+  push:
+    paths:
+      - .github/workflows/_sanity.yml
+  workflow_dispatch: {}
+
+jobs:
+  hi:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Hello from Actions"
