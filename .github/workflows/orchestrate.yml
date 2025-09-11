@@ -201,21 +201,21 @@ jobs:
         run: |
           mkdir -p drafts/outreach reports/agent_runs
           [ -f drafts/outreach/template.md ] || cat > drafts/outreach/template.md << 'MD'
-# Outreach Draft (v1)
+          # Outreach Draft (v1)
 
-**Zielkunden:** B2B-Leads aus Parsing-Pipeline  
-**CTA:** 15-min Call oder 2-Min-Demo
+          **Zielkunden:** B2B-Leads aus Parsing-Pipeline
+          **CTA:** 15-min Call oder 2-Min-Demo
 
-## Version A (Kurz)
-Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}} Minuten automatisiert.
-Darf ich dir in 2 Screens zeigen, wie?
+          ## Version A (Kurz)
+          Hi {{first_name}}, wir haben ein kleines Tool gebaut, das {{pain_point}} in {{X}} Minuten automatisiert.
+          Darf ich dir in 2 Screens zeigen, wie?
 
-## Version B (Value-first)
-Hey {{first_name}}, mir ist bei {{company}} aufgefallen: {{trigger}}.
-Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-Min-Demo schicken?
+          ## Version B (Value-first)
+          Hey {{first_name}}, mir ist bei {{company}} aufgefallen: {{trigger}}.
+          Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-Min-Demo schicken?
 
-— {{sender}}
-MD
+          — {{sender}}
+          MD
           [ -f drafts/README.md ] || echo -e "# Drafts\nDeterministische Vorlagen. Keine PII/Secrets. Änderungen per PR." > drafts/README.md
           FILE="reports/agent_runs/orchestrator-fallback-growth-issue-${{ github.event.issue.number || 'manual' }}.md"
           [ -f "$FILE" ] || { echo "# Orchestrator fallback (Growth)" > "$FILE"; echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"; }
