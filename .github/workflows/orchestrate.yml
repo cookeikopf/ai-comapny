@@ -9,11 +9,6 @@ on:
         description: "Issue number to orchestrate"
         required: true
 
-# Wichtig: KEIN inputs.* mehr hier oben! (nicht verfügbar auf Issue-Events)
-concurrency:
-  group: ${{ format('orchestrate-{0}', github.event.issue.number || github.run_id) }}
-  cancel-in-progress: true
-
 permissions:
   contents: write
   issues: write
@@ -22,14 +17,17 @@ permissions:
 
 jobs:
   orchestrate:
-    # Läuft auf Issue-Events sowie manuellen Dispatches; Label wird später geprüft
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'issues' }}
     runs-on: ubuntu-latest
+
+    # WICHTIG: Concurrency nur auf Job-Ebene, mit safe Fallback auf run_id
+    concurrency:
+      group: orchestrate-${{ github.event.issue.number || github.run_id }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
 
-      # Debug: zeigt uns direkt im Log, was ankommt
+      # Kurzdiagnose im Log
       - name: Debug context
         run: |
           echo "event_name=${{ github.event_name }}"
@@ -37,7 +35,7 @@ jobs:
           echo "ref=${{ github.ref }}"
           echo "repo=${{ github.repository }}"
 
-      # Synthetic event für workflow_dispatch -> scripts/orchestrate.py kann GITHUB_EVENT_PATH lesen
+      # Synthetic Event für manuellen Start
       - name: Build synthetic event for workflow_dispatch
         if: ${{ github.event_name == 'workflow_dispatch' }}
         id: synth
@@ -46,17 +44,15 @@ jobs:
           script: |
             const issue_number = Number(core.getInput('issue_number'));
             const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number });
-            // optional: Label ergänzen, damit nachfolgende Guards true sind
-            const hasLabel = (issue.labels || []).some(l => (l.name||l) === 'task:agent');
-            if (!hasLabel) {
+            if (!(issue.labels || []).some(l => (l.name||l)==='task:agent')) {
               await github.rest.issues.addLabels({ ...context.repo, issue_number, labels: ['task:agent'] });
             }
-            const fs = require('fs'); const path = require('path');
+            const fs = require('fs'), path = require('path');
             const p = path.join(process.env.RUNNER_TEMP, 'event.json');
             fs.writeFileSync(p, JSON.stringify({ issue }), 'utf8');
             core.setOutput('event_path', p);
 
-      # Prüfen, ob das Issue das Label 'task:agent' trägt
+      # Label-Guard
       - name: Ensure label 'task:agent'
         id: labelcheck
         uses: actions/github-script@v7
@@ -67,9 +63,8 @@ jobs:
               ? Number(core.getInput('issue_number'))
               : context.payload.issue.number;
             const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number });
-            return (issue.labels || []).some(l => (l.name || l) === 'task:agent') ? 'true' : 'false';
+            return (issue.labels || []).some(l => (l.name||l)==='task:agent') ? 'true' : 'false';
 
-      # Wenn Label fehlt, freundlich kommentieren und Job „grün“ beenden
       - name: Comment missing label and exit
         if: ${{ steps.labelcheck.outputs.result != 'true' }}
         uses: actions/github-script@v7
@@ -78,9 +73,10 @@ jobs:
             const issue_number = context.eventName === 'workflow_dispatch'
               ? Number(core.getInput('issue_number'))
               : context.payload.issue.number;
-            const body = "ℹ️ Orchestrator übersprungen: Issue hat nicht das Label `task:agent`. " +
-                         "Bitte Label setzen (ein-/ausblenden reicht), dann startet die Planung.";
-            await github.rest.issues.createComment({ ...context.repo, issue_number, body });
+            await github.rest.issues.createComment({
+              ...context.repo, issue_number,
+              body: "ℹ️ Orchestrator übersprungen: Bitte Label `task:agent` setzen (ein-/ausblenden reicht)."
+            });
 
       - uses: actions/setup-python@v5
         if: ${{ steps.labelcheck.outputs.result == 'true' }}
@@ -113,11 +109,10 @@ jobs:
             const issue_number = context.eventName === 'workflow_dispatch'
               ? Number(core.getInput('issue_number'))
               : context.payload.issue.number;
-            const planPath = process.env.PLAN_PATH || "(kein Plan gefunden)";
-            const body = `Plan erzeugt/aktualisiert: \`${planPath}\``;
+            const body = `Plan erzeugt/aktualisiert: \`${process.env.PLAN_PATH || "(kein Plan)"}\``;
             await github.rest.issues.createComment({ ...context.repo, issue_number, body });
 
-      # Agenten-Dispatch + Run-Erkennung (Engineer & Growth) – mit VOLLEN Pfaden
+      # Agenten-Dispatch (volle Pfade) + Run-Erkennung
       - name: Trigger agents (repo_dispatch + workflow_dispatch + detection)
         if: ${{ steps.labelcheck.outputs.result == 'true' }}
         id: dispatch
@@ -134,11 +129,10 @@ jobs:
             const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number });
             const title = (issue.title || "").toLowerCase();
             const ref = (context.ref && context.ref.replace("refs/heads/",""))
-                      || (context.payload?.repository?.default_branch) || "main";
+                     || (context.payload?.repository?.default_branch) || "main";
 
             const wantsEngineer = /(parse|script|normalize|gate|test|engineer|pipeline)/.test(title);
             const wantsGrowth   = /(outreach|draft|growth|message|email|template)/.test(title);
-
             const fireEngineer = wantsEngineer || (!wantsEngineer && !wantsGrowth);
             const fireGrowth   = wantsGrowth;
 
@@ -150,9 +144,8 @@ jobs:
 
             async function dispatchAndWait(tag, wfPath, waitSeconds) {
               const start = Date.now();
-              try {
-                await github.rest.repos.createDispatchEvent({ owner, repo, event_type: tag, client_payload: payloadBase });
-              } catch (e) { core.info(`repository_dispatch ${tag} failed: ${e.message}`); }
+              try { await github.rest.repos.createDispatchEvent({ owner, repo, event_type: tag, client_payload: payloadBase }); }
+              catch (e) { core.info(`repository_dispatch ${tag} failed: ${e.message}`); }
               try {
                 await github.rest.actions.createWorkflowDispatch({
                   owner, repo, workflow_id: wfPath, ref,
@@ -180,20 +173,12 @@ jobs:
             core.setOutput("NEED_FALLBACK_GROWTH",   growthOk   ? "false" : "true");
 
       # Fallback Engineer
-      - name: Prepare engineer fallback
-        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
-        uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-
       - name: Engineer fallback change
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
         run: |
           mkdir -p reports/agent_runs
           FILE="reports/agent_runs/orchestrator-fallback-engineer-issue-${{ github.event.issue.number || 'manual' }}.md"
-          if [ ! -f "$FILE" ]; then
-            echo "# Orchestrator fallback (Engineer)" > "$FILE"
-            echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"
-          fi
+          [ -f "$FILE" ] || { echo "# Orchestrator fallback (Engineer)" > "$FILE"; echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"; }
 
       - name: Fallback PR (Engineer)
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_ENGINEER == 'true' }}
@@ -211,11 +196,6 @@ jobs:
           delete-branch: true
 
       # Fallback Growth
-      - name: Prepare growth fallback
-        if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
-        uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-
       - name: Growth fallback change
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
         run: |
@@ -238,10 +218,7 @@ Wir haben {{benefit}} mit {{proof}} erreicht. Soll ich dir eine 2-Min-Demo schic
 MD
           [ -f drafts/README.md ] || echo -e "# Drafts\nDeterministische Vorlagen. Keine PII/Secrets. Änderungen per PR." > drafts/README.md
           FILE="reports/agent_runs/orchestrator-fallback-growth-issue-${{ github.event.issue.number || 'manual' }}.md"
-          if [ ! -f "$FILE" ]; then
-            echo "# Orchestrator fallback (Growth)" > "$FILE"
-            echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"
-          fi
+          [ -f "$FILE" ] || { echo "# Orchestrator fallback (Growth)" > "$FILE"; echo "Plan: ${{ steps.orch.outputs.plan_path }}" >> "$FILE"; }
 
       - name: Fallback PR (Growth)
         if: ${{ steps.dispatch.outputs.NEED_FALLBACK_GROWTH == 'true' }}
