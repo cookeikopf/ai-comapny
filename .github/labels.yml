@@ -7,3 +7,6 @@
 - name: agent:growth
   color: 1d76db
   description: Growth agent PRs
+- name: proposal:ceo
+  color: b60205
+  description: CEO proposals waiting approval
