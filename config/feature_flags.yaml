@@ -6,3 +6,4 @@
 allow_outbound_email: false
 allow_slack_post: false
 allow_web_rpa: false
+allow_openai_api: false

@@ -1,8 +1,17 @@
 name: codeql
 on:
   pull_request:
+    paths:
+      - '**/*.py'
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.go'
+      - '**/*.java'
+      - '.github/workflows/**'
   schedule:
     - cron: '0 3 * * *'
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 jobs:
   analyze:
     uses: github/codeql-action/analyze@v3

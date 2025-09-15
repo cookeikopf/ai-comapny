@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
   statuses: write
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
   smoke:
@@ -16,7 +18,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
-          python -m pip install --quiet pytest
+          python -m pip install --quiet pytest pyyaml
+      - name: Verify OpenAI flag
+        run: |
+          python - <<'PY'
+          import os, yaml, sys
+          with open('config/feature_flags.yaml') as f:
+              flags = yaml.safe_load(f)
+          if flags.get('allow_openai_api') and not os.environ.get('OPENAI_API_KEY'):
+              print('OPENAI_API_KEY required when allow_openai_api=true')
+              sys.exit(1)
+          PY
       - name: Run unit tests
         run: |
           pytest -q

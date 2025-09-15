@@ -16,6 +16,10 @@ Dieses Repository enthält die Grundstruktur für ein agentisches Unternehmen mi
 4. **Issue "Go-to-Market Sprint 1"** mit Label `task:agent` öffnen, um den Orchestrator zu starten (orchestrate Workflow).
 5. **PRs reviewen**: Merges auf `main` nur nach bestandenem Eval und Approval.
 
+### CEO-Proposals
+Der Workflow `ceo-observer.yml` kann manuell gestartet werden und erstellt ein Issue mit Vorschlägen des CEO-Agenten.
+Mit dem Workflow "Approve CEO Proposal" lässt sich ein Vorschlag freigeben und weiterverfolgen.
+
 ## Betriebsprinzip
 Dieses Projekt verfolgt einen **Deterministic‑first, AI‑last**‑Ansatz. Aufgaben werden, soweit möglich, zuerst mit deterministischen Funktionen, Regeln oder klassischen Algorithmen umgesetzt. Nur wenn diese Ansätze scheitern (z. B. weil die Spezifikation unvollständig ist, die Recall‑Rate unter 80 % liegt oder eine Generierung von Freitext erforderlich ist), eskaliert der Orchestrator zur Nutzung eines großen Sprachmodells (LLM). Selbst dann gilt: jede außenwirksame Aktion (E‑Mail, Deploy, Finanzausgabe) passiert ausschließlich nach deiner manuellen Freigabe via GitHub (Human‑in‑the‑Loop).
 

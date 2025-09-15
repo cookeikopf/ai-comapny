@@ -1,4 +1,5 @@
 import os, json, datetime, pathlib, traceback, re
+from llm import chat
 
 def yaml_escape(s: str) -> str:
     return (s or "").replace("\\", "\\\\").replace('"', '\\"')
@@ -37,6 +38,7 @@ def main():
         plan_path = f"reports/board/plan-{num}-{ts}.md"
         should_write = True
 
+    ai_plan = chat("founder", f"Issue #{num}: {title}\n{body}")
     if should_write:
         fm = ["---",
               f"issue: {num}",
@@ -51,6 +53,9 @@ def main():
 
 ## Kontext
 {body or '(kein Issue-Body)'}
+
+## AI Plan
+{ai_plan or '(kein Model-Output – deterministische Platzhalter)'}
 
 ## Deterministischer Ansatz
 1. I/O spezifizieren, Tests zuerst
