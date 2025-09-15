@@ -1,6 +1,10 @@
 name: CEO Observer (Proposals only)
 on:
-  workflow_dispatch: {}
+  # Manuell ausführbar über "Run workflow"
+  workflow_dispatch:
+  # Optional: bei jedem Push ausführen – entferne diese Zeile, wenn du das nicht willst
+  push:
+    branches: [main]
 permissions:
   issues: write
   contents: read
@@ -10,7 +14,8 @@ jobs:
   propose:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - name: Compose CEO proposals
+        uses: actions/github-script@v7
         with:
           script: |
             const today = new Date().toISOString().split('T')[0];
@@ -18,16 +23,15 @@ jobs:
             const body = `
 **Kontext:** Basierend auf aktuellen Berichten und offenen Issues im Repository.
 **Vorschläge:**
-- [ ] Outreach-Iteration v2 (KPI: Antworten > 8 %, Budget: 0 €, Risiko: niedrig)
-- [ ] Eval erweitern (mehr Smoke‑Checks) (KPI: 100 % Green bei PRs, Budget: 0 €, Risiko: niedrig)
+- [ ] Outreach-Iteration v2 (KPI: Antworten > 8 %, Budget: 0 €, Risiko: niedrig)
+- [ ] Eval erweitern (mehr Smoke‑Checks) (KPI: 100 % Green bei PRs, Budget: 0 €, Risiko: niedrig)
 
 **Hinweis:** Das sind nur Vorschläge. Zum Starten bitte den grünen Knopf („Approve CEO Proposal“) nutzen.
 `;
-            const issue = await github.rest.issues.create({
+            await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title,
               body,
               labels: ['proposal:ceo']
             });
-            core.setOutput('issue_number', issue.data.number);
