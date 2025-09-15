@@ -27,3 +27,8 @@
 Run the `eval.yml` workflow or `pytest` locally to ensure changes pass basic checks.
 
 See `docs/TROUBLESHOOTING.md` for common problems.
+
+## OpenAI API Setup
+1. Hinterlege den API-Key als Repository Secret `OPENAI_API_KEY`.
+2. Setze in `config/feature_flags.yaml` den Schalter `allow_openai_api` auf `true`.
+3. Kosten: 1,25 USD pro 1 Mio Tokens Input, 10 USD pro 1 Mio Tokens Output.

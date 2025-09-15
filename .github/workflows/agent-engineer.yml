@@ -13,6 +13,8 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 jobs:
   engineer:
     runs-on: ubuntu-latest
@@ -68,11 +70,15 @@ PY
         with: { python-version: '3.11' }
       - run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest || true
+          python -m pip install -r requirements.txt pytest || true
       - name: Quick local test (non-blocking)
         continue-on-error: true
         run: |
           if [ -f tests/test_normalize_leads.py ]; then pytest -q || true; else echo "no tests yet"; fi
+      - name: GPT engineer plan (non-blocking)
+        continue-on-error: true
+        run: |
+          python scripts/engineer.py || true
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
         with:

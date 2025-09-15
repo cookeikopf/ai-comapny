@@ -10,6 +10,7 @@ This repository hosts automation for the "ai-comapny" project. Key areas:
 - `.github/workflows/labels.yml` – syncs repository labels.
 - `.github/workflows/secret-scan.yml` – soft secret scanning.
 - `.github/workflows/eval.yml` – run lightweight evaluations.
+- `.github/workflows/ceo-observer.yml` – erstellt CEO-Vorschlags-Issues; mit `approve-proposal.yml` freigeben.
 
 ## Scripts
 - `scripts/send_messages.py` – parse drafts under `outreach/drafts/` and send or dry‑run messages.
