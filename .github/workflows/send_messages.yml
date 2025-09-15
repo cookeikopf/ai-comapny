@@ -16,8 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
+        if: ${{ hashFiles('requirements.txt', 'scripts/requirements.txt') != '' }}
         run: |
-          python -m pip install --quiet
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          elif [ -f scripts/requirements.txt ]; then
+            pip install -r scripts/requirements.txt
+          fi
       - name: Send messages
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

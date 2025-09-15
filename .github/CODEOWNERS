@@ -1,7 +1,1 @@
-# Define default reviewers/owners for critical parts of the repository.
-# Replace "@your‑github‑user" with your actual GitHub username to ensure you
-# receive review requests for all sensitive changes.
-/agents/**            @your-github-user
-/scripts/**           @your-github-user
-/.github/**           @your-github-user
-/docs/**              @your-github-user
+* @cookeikopf
