@@ -1,4 +1,4 @@
-name: Agent Task
+name: Agent Task (Form)
 description: Orchestrator + Agents starten für diese Aufgabe
 labels: ["task:agent"]
 body:
